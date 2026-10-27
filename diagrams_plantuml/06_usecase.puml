@@ -1,0 +1,61 @@
+@startuml PostureCare_UseCase
+!theme plain
+left to right direction
+title PostureCare - Use Cases v2.0
+
+actor Clinician
+actor Researcher
+actor DevOpsAdmin
+actor IntegrationClient as "Integration / BI Tool"
+
+rectangle PostureCare {
+  usecase UC1 as "Patient Monitoring"
+  usecase UC2 as "Select Patient"
+  usecase UC3 as "Check Alerts"
+
+  usecase UC6 as "Research Analytics"
+  usecase UC7 as "Population Stats"
+  usecase UC8 as "Export Data"
+
+  usecase UC11 as "System Health"
+  usecase UC12 as "Service Status"
+  usecase UC13 as "Performance"
+
+  usecase UC_ACCESS as "Access Dashboards"
+  usecase UC_QUERY as "Query Prometheus"
+  usecase UC_GRAPHQL as "Query GraphQL API"
+  usecase UC_SUBSCRIBE as "Subscribe to Events"
+  usecase UC_AUTH as "Authenticate with API Key"
+
+}
+
+Clinician --> UC1
+Clinician --> UC2
+Clinician --> UC3
+
+Researcher --> UC6
+Researcher --> UC7
+Researcher --> UC8
+
+DevOpsAdmin --> UC11
+DevOpsAdmin --> UC12
+DevOpsAdmin --> UC13
+
+IntegrationClient --> UC_GRAPHQL
+IntegrationClient --> UC_SUBSCRIBE
+
+UC1 ..> UC_ACCESS : includes
+UC2 ..> UC_QUERY : includes
+UC3 ..> UC_QUERY : includes
+
+UC6 ..> UC_ACCESS : includes
+UC7 ..> UC_QUERY : includes
+
+UC11 ..> UC_ACCESS : includes
+UC12 ..> UC_QUERY : includes
+
+UC_GRAPHQL ..> UC_AUTH : includes
+UC_SUBSCRIBE ..> UC_AUTH : includes
+UC_GRAPHQL ..> UC_QUERY : can complement
+
+@enduml

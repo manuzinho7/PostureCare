@@ -1,0 +1,248 @@
+
+PostureCare – Estrutura de Dados v0.1
+
+VISÃO GERAL
+
+O protocolo PostureCare define uma estrutura de comunicação para transmissão de dados biométricos, estado do sistema e comandos de atuação através de BLE (Bluetooth Low Energy).
+
+Os tipos de informação suportados incluem:
+- Dados IMU (Inertial Measurement Unit)
+- Dados EMG (Electromyography)
+- Dados SmO₂ (Muscle Oxygen Saturation)
+- Comandos para fibras atuadoras
+- Estado do sistema ESP32
+
+==================================================
+ESTRUTURA GERAL DO FRAME BLE
+==================================================
+
+magic
+- Tipo: u16
+- Descrição: Identificador do protocolo
+- Exemplo: 0x5043
+- Objetivo: Validar que o frame pertence ao protocolo PostureCare.
+
+version
+- Tipo: u8
+- Descrição: Versão do protocolo
+- Valor atual: 1
+- Objetivo: Garantir compatibilidade entre versões futuras.
+
+msg_type
+- Tipo: u8
+- Valores:
+  1 = Sensor
+  2 = Command
+  3 = Acknowledgment
+  4 = Status
+- Define como o payload deve ser interpretado.
+
+sequence
+- Tipo: u16
+- Intervalo: 0–65535
+- Contador incremental para detetar perda ou duplicação de mensagens.
+
+timestamp_ms
+- Tipo: u32
+- Unidade: milissegundos
+- Intervalo: 0–4.2 bilhões
+- Permite sincronização temporal com aplicação móvel e cloud.
+
+payload_length
+- Tipo: u16
+- Intervalo: 0–512
+- Indica o tamanho dos dados transportados no payload.
+
+crc16
+- Tipo: u16
+- Utiliza CRC-16 para garantir a integridade da mensagem BLE.
+
+==================================================
+DADOS IMU
+==================================================
+
+imu_id
+- Tipo: u8
+- Intervalo: 0–255
+- Identificador único do acelerómetro.
+
+roll_deg
+- Tipo: i16
+- Escala: 0.01°
+- Intervalo: -18000 a +18000
+- Inclinação lateral relativa ao plano frontal.
+
+pitch_deg
+- Tipo: i16
+- Escala: 0.01°
+- Intervalo: -18000 a +18000
+- Flexão/extensão no plano sagital.
+
+yaw_deg
+- Tipo: i16
+- Escala: 0.01°
+- Intervalo: -18000 a +18000
+- Rotação axial no plano transversal.
+
+acc_rms_mg
+- Tipo: u16
+- Unidade: mg
+- Intervalo: 0–16000
+- Intensidade média da aceleração numa janela temporal.
+
+gyro_rms_mdps
+- Tipo: u16
+- Unidade: mdps
+- Intervalo: 0–200000
+- Velocidade angular RMS numa janela temporal.
+
+==================================================
+DADOS EMG
+==================================================
+
+emg_id
+- Tipo: u8
+- Intervalo: 0–255
+
+rms_uv
+- Tipo: u16
+- Unidade: µV
+- Intervalo: 0–2000
+- Amplitude eficaz do sinal EMG filtrado.
+
+mav_uv
+- Tipo: u16
+- Unidade: µV
+- Intervalo: 0–2000
+- Valor absoluto médio do sinal.
+
+iemg_uvs
+- Tipo: u32
+- Unidade: µV·s
+- Intervalo: 0–100000
+- Integral da atividade muscular.
+
+mdf_cHz
+- Tipo: u16
+- Escala: 0.01 Hz
+- Intervalo: 2000–15000
+- Frequência mediana para análise de fadiga.
+
+mnf_cHz
+- Tipo: u16
+- Escala: 0.01 Hz
+- Intervalo: 2000–15000
+- Frequência média do espectro EMG.
+
+activation_q15
+- Tipo: u16
+- Intervalo: 0–32767
+- Nível de ativação muscular normalizado.
+
+==================================================
+DADOS SmO₂
+==================================================
+
+smo2_id
+- Tipo: u8
+- Intervalo: 0–255
+
+smo2_cPct
+- Tipo: u16
+- Escala: 0.01%
+- Intervalo: 0–10000
+- Percentagem de oxigenação muscular.
+
+trend_cPct_per_min
+- Tipo: i16
+- Escala: 0.01%/min
+- Intervalo: -500 a +500
+- Variação temporal da oxigenação.
+
+quality_q15
+- Tipo: u16
+- Intervalo: 0–32767
+- Qualidade do sinal NIRS.
+
+==================================================
+COMANDOS PARA FIBRAS ATUADORAS
+==================================================
+
+fiber_id
+- Tipo: u8
+- Intervalo: 0–255
+
+command_id
+- Tipo: u16
+- Intervalo: 0–65535
+
+mode
+- STOP
+- SET
+- PATTERN
+- RAMP
+
+target_mask
+- Bitmask para seleção de zonas:
+  - Cervical
+  - Torácica
+  - Lombar
+  - Esquerda
+  - Direita
+
+intensity_q15
+- Tipo: u16
+- Intervalo: 0–32767
+- Intensidade normalizada do estímulo.
+
+duration_ms
+- Tipo: u16
+- Intervalo: 0–60000 ms
+
+pattern_id
+- Tipo: u8
+- Intervalo: 0–255
+
+==================================================
+ESTADO DO SISTEMA ESP32
+==================================================
+
+battery_mV
+- Tipo: u16
+- Unidade: mV
+- Intervalo: 3000–4200
+
+battery_pct
+- Tipo: u8
+- Unidade: %
+- Intervalo: 0–100
+
+charge_state
+- Tipo: u8
+- Estados possíveis: 0, 1, 2
+
+uptime_s
+- Tipo: u32
+- Unidade: segundos
+
+temp_cC
+- Tipo: i16
+- Escala: 0.01°C
+- Intervalo: 2000–6000
+
+heap_free
+- Tipo: u32
+- Unidade: bytes
+
+error_flags
+- Tipo: u32
+- Formato: bitmask
+
+==================================================
+RESUMO
+==================================================
+
+O protocolo PostureCare é composto por:
+1. Frame BLE genérico com metadados e integridade.
+2. Payloads para IMU, EMG, SmO₂, comandos e estado do ESP32.
+3. Mecanismos de sincronização, identificação de sensores, controlo de atuadores e monitorização do sistema.

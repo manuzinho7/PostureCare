@@ -1,0 +1,147 @@
+@startuml PostureCare_Class
+!theme plain
+title PostureCare GraphQL & Dashboard Class Diagram
+
+class Dashboard {
+  - id: string
+  - title: string
+  - panels: Panel[]
+  - refresh_interval: string
+  --
+  + load_panels()
+  + execute_queries()
+  + render()
+}
+
+class Panel {
+  - id: string
+  - title: string
+  - type: PanelType
+  - query: string
+  --
+  + execute_query()
+  + render_visualization()
+}
+
+enum PanelType {
+  TIME_SERIES
+  GAUGE
+  PIE_CHART
+  BAR_CHART
+  STAT_CARD
+}
+
+class Variable {
+  - name: string
+  - type: VariableType
+  - options: string[]
+  --
+  + get_value()
+  + set_value()
+}
+
+enum VariableType {
+  DROPDOWN
+  MULTI_SELECT
+  TEXT_INPUT
+}
+
+class PatientMonitoringDashboard extends Dashboard {
+  + filter_by_patient_id()
+  + show_posture_timeline()
+  + show_alert_summary()
+}
+
+class ResearchAnalyticsDashboard extends Dashboard {
+  + calculate_alert_rate()
+  + generate_statistics()
+}
+
+class SystemHealthDashboard extends Dashboard {
+  + check_service_status()
+  + monitor_resources()
+}
+
+class PrometheusQuery {
+  - query_string: string
+  - result: Metric[]
+  --
+  + validate()
+  + execute()
+}
+
+class Metric {
+  - name: string
+  - labels: Map
+  - value: float64
+  - timestamp: DateTime
+}
+
+class GraphQLApi {
+  - endpoint: string
+  - schema: Schema
+  - api_keys: string[]
+  --
+  + resolve_query()
+  + resolve_subscription()
+  + seed_synthetic_data()
+}
+
+class QueryResolver {
+  - data_access: DataAccess
+  - auth: ApiKeyAuth
+  --
+  + get_patient_session()
+  + get_alert_summary()
+  + get_system_status()
+}
+
+class SubscriptionResolver {
+  - pubsub: PubSubManager
+  - redis_client: RedisClient
+  --
+  + subscribe_alerts()
+  + subscribe_device_status()
+  + publish_event()
+}
+
+class DataAccess {
+  - postgres_host: string
+  - prometheus_url: string
+  --
+  + fetch_postgres_data()
+  + fetch_prometheus_metrics()
+}
+
+class ApiKeyAuth {
+  - allowed_keys: string[]
+  --
+  + validate_request()
+  + extract_api_key()
+}
+
+class PubSubManager {
+  - subscriptions: Map
+  - redis_enabled: bool
+  --
+  + subscribe()
+  + unsubscribe()
+  + publish()
+}
+
+Dashboard --> Panel : contains
+Dashboard --> Variable : has
+Panel --> PanelType : uses
+Dashboard --> PrometheusQuery : executes
+PrometheusQuery --> Metric : returns
+
+GraphQLApi --> QueryResolver : uses
+GraphQLApi --> SubscriptionResolver : uses
+QueryResolver --> DataAccess : reads
+QueryResolver --> ApiKeyAuth : checks
+SubscriptionResolver --> PubSubManager : publishes
+SubscriptionResolver --> RedisClient : optional backend
+DataAccess --> PrometheusQuery : reads metrics
+PubSubManager --> ApiKeyAuth : protected events
+
+@enduml

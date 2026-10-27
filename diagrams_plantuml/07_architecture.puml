@@ -1,0 +1,71 @@
+@startuml PostureCare_Architecture
+!theme plain
+title PostureCare - Layered Architecture v2.0
+
+package "Presentation Layer" {
+  component [Grafana Web UI]
+  component [Patient Monitoring]
+  component [Research Analytics]
+  component [System Health]
+  component [GraphQL Playground]
+}
+
+package "API & Query Layer" {
+  component [GraphQL API]
+  component [Query Resolver]
+  component [Subscription Resolver]
+  component [PromQL Executor]
+}
+
+package "Data Access Layer" {
+  component [Data Access Service]
+  component [API Key Auth]
+  component [Pub/Sub Manager]
+  component [Cache Resolver]
+}
+
+package "Ingestion & Messaging" {
+  component [CSV Ingester]
+  component [Metrics Parser]
+  component [Validation Engine]
+  component [Redis Pub/Sub]
+  component [Push Gateway]
+}
+
+package "Storage Layer" {
+  database [Prometheus TSDB]
+  database [PostgreSQL]
+  database [Redis]
+}
+
+package "Data Source Layer" {
+  file [CSV Files]
+}
+
+[Grafana Web UI] --> [GraphQL API]
+[GraphQL Playground] --> [GraphQL API]
+[Patient Monitoring] --> [GraphQL API]
+[Research Analytics] --> [GraphQL API]
+[System Health] --> [GraphQL API]
+
+[GraphQL API] --> [Query Resolver]
+[GraphQL API] --> [Subscription Resolver]
+[Query Resolver] --> [Data Access Service]
+[Subscription Resolver] --> [Pub/Sub Manager]
+[Subscription Resolver] --> [API Key Auth]
+
+[Data Access Service] --> [PromQL Executor]
+[Data Access Service] --> [Cache Resolver]
+[Cache Resolver] --> [Redis]
+[Pub/Sub Manager] --> [Redis Pub/Sub]
+
+[CSV Ingester] --> [Validation Engine]
+[Validation Engine] --> [Metrics Parser]
+[Metrics Parser] --> [Push Gateway] : HTTP POST
+[Push Gateway] --> [Prometheus TSDB] : scrape
+[GraphQL API] --> [PostgreSQL] : patient/session metadata
+[GraphQL API] --> [Prometheus TSDB] : telemetry queries
+[GraphQL API] --> [Redis] : realtime pub/sub + cache
+[CSV Files] --> [CSV Ingester]
+
+@enduml

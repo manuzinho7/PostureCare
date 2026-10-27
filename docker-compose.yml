@@ -1,0 +1,157 @@
+services:
+  # PostgreSQL: Structured patient/session data
+  postgres:
+    image: postgres:15-alpine
+    container_name: posture-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-posture_db}
+      POSTGRES_USER: ${POSTGRES_USER:-posture_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-posture_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-posture_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - posture-net
+
+  # Prometheus Push Gateway: Receiving metrics from batch jobs
+  push-gateway:
+    image: prom/pushgateway:latest
+    container_name: posture-push-gateway
+    ports:
+      - "9091:9091"
+    networks:
+      - posture-net
+    volumes:
+      - pg_data:/prometheus
+
+  # Prometheus: Time-series storage for sensor data
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: posture-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - posture-net
+    depends_on:
+      - postgres
+      - push-gateway
+
+  # Redis: Pub/Sub for real-time events
+  redis:
+    image: redis:7-alpine
+    container_name: posture-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - posture-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # GraphQL API Microservice (Phase 2)
+  graphql-api:
+    build:
+      context: ./services/graphql_api
+      dockerfile: Dockerfile
+    container_name: posture-graphql-api
+    ports:
+      - "8000:8000"
+    environment:
+      PROMETHEUS_URL: "http://prometheus:9090"
+      PUSH_GATEWAY_URL: "http://push-gateway:9091"
+      REDIS_URL: "redis://posture-redis:6379/0"
+      REDIS_ENABLED: "true"
+      POSTGRES_HOST: "posture-postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-posture_db}
+      POSTGRES_USER: ${POSTGRES_USER:-posture_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-posture_password}
+      GRAPHQL_API_KEYS: ${GRAPHQL_API_KEYS:-test-key-123,dev-key-456}
+      CSV_INGESTION_POLLING_ENABLED: "true"
+      CSV_INGESTION_CSV_PATH: "/app/sample-data/live_sensor_stream.csv"
+      CSV_INGESTION_POLL_INTERVAL_SECONDS: "1"
+      CSV_INGESTION_JOB_PREFIX: "graphql_csv_stream"
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./sample-data:/app/sample-data
+    networks:
+      - posture-net
+    depends_on:
+      - postgres
+      - push-gateway
+      - prometheus
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Continuous synthetic CSV stream (1 row per second)
+  csv-streamer:
+    image: python:3.11-slim
+    container_name: posture-csv-streamer
+    working_dir: /workspace
+    command:
+      - sh
+      - -c
+      - pip install --no-cache-dir requests && python scripts/realtime_csv_streamer.py --csv-path sample-data/live_sensor_stream.csv --interval 1
+    volumes:
+      - ./:/workspace
+    environment:
+      PYTHONUNBUFFERED: "1"
+    networks:
+      - posture-net
+    depends_on:
+      - graphql-api
+
+  # Grafana: Dashboard platform
+  grafana:
+    image: grafana/grafana:latest
+    container_name: posture-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: '1s'
+      GF_INSTALL_PLUGINS: ''
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - posture-net
+    depends_on:
+      - prometheus
+      - postgres
+      - graphql-api
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  pg_data:
+  grafana_data:
+  redis_data:
+
+networks:
+  posture-net:
+    driver: bridge

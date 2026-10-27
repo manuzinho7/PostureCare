@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY scripts/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy ingester script
+COPY scripts/csv_ingester.py .
+
+# Default command: show help
+ENTRYPOINT ["python", "csv_ingester.py"]
+CMD ["--help"]

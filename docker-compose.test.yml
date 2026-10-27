@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: posture-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-posture_db}
+      POSTGRES_USER: ${POSTGRES_USER:-posture_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-posture_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-posture_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - posture-net
+
+  push-gateway:
+    image: prom/pushgateway:latest
+    container_name: posture-push-gateway
+    ports:
+      - "9091:9091"
+    networks:
+      - posture-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: posture-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - posture-net
+    depends_on:
+      - push-gateway
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: posture-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: ''
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - posture-net
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  posture-net:
+    driver: bridge

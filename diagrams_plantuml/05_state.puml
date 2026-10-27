@@ -1,0 +1,91 @@
+@startuml PostureCare_State
+!theme plain
+title PostureCare Platform State Machine
+
+[*] --> INITIALIZING
+
+state INITIALIZING {
+  [*] --> Boot
+  Boot --> ConnectInfrastructure
+  ConnectInfrastructure --> LoadDashboards
+  LoadDashboards --> LoadGraphQLSchema
+  LoadGraphQLSchema --> LoadVariables
+  LoadVariables --> [*]
+}
+
+INITIALIZING --> READY : Success
+INITIALIZING --> ERROR : Failure
+
+state READY {
+  note right
+    Dashboards loaded
+    Datasources connected
+    GraphQL endpoint ready
+    Redis subscriptions available
+  end note
+}
+
+READY --> QUERYING : User opens dashboard
+READY --> API_PROCESSING : GraphQL request arrives
+
+state QUERYING {
+  [*] --> Execute
+  Execute --> Receive
+  Receive --> Process
+  Process --> [*]
+}
+
+QUERYING --> RENDERING : Data ready
+
+state API_PROCESSING {
+  [*] --> Authenticate
+  Authenticate --> Resolve
+  Resolve --> Publish
+  Publish --> [*]
+}
+
+API_PROCESSING --> QUERYING : Query response ready
+API_PROCESSING --> STREAMING : Subscription event emitted
+
+state STREAMING {
+  note right
+    Redis pub/sub active
+    Real-time subscriptions
+    Synthetic or live events
+  end note
+}
+
+STREAMING --> QUERYING : Event consumed
+
+state RENDERING {
+  [*] --> Render
+  Render --> Format
+  Format --> Display
+  Display --> [*]
+}
+
+RENDERING --> DISPLAYING : Render complete
+
+state DISPLAYING {
+  note right
+    Active presentation
+    User interacting
+    Auto-refresh active
+  end note
+}
+
+DISPLAYING --> QUERYING : Refresh interval\n(1-30 seconds)
+DISPLAYING --> ERROR : Query fails
+
+state ERROR {
+  note right
+    Show error message
+    Log details
+    Retry query or reconnect
+  end note
+}
+
+ERROR --> QUERYING : Retry successful
+ERROR --> DISPLAYING : User acknowledges
+
+@enduml

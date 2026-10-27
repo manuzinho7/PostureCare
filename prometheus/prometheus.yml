@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'PostureCare'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Push Gateway - scrape metrics pushed by batch jobs
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['push-gateway:9091']
+    metric_relabel_configs:
+      # Relabel job/instance labels from pushgateway
+      - source_labels: [__meta_job]
+        target_label: job
+      - source_labels: [__meta_instance]
+        target_label: instance
+
+  # GraphQL API metrics (Phase 2)
+  - job_name: 'graphql-api'
+    static_configs:
+      - targets: ['graphql-api:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # Posture sensor metrics (example - would be actual sensor service)
+  # - job_name: 'posture-sensors'
+  #   static_configs:
+  #     - targets: ['localhost:9100']
+  #   metrics_path: '/metrics'
+  #   scrape_interval: 10s
+

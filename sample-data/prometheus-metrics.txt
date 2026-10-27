@@ -1,0 +1,31 @@
+# Sample Prometheus Metrics for PostureCare
+# This file contains example metrics that can be used to test the dashboards
+# Format: <METRIC> <VALUE> [TIMESTAMP]
+
+# Posture Monitoring Metrics
+posture_monitoring_active{patient_id="patient_001",session_id="session_001"} 1
+posture_monitoring_active{patient_id="patient_002",session_id="session_002"} 1
+posture_monitoring_active{patient_id="patient_003",session_id="session_003"} 0
+
+posture_spine_angle{patient_id="patient_001",measurement_id="m1"} 25.5
+posture_spine_angle{patient_id="patient_001",measurement_id="m2"} 26.1
+posture_spine_angle{patient_id="patient_002",measurement_id="m3"} 28.3
+posture_spine_angle{patient_id="patient_002",measurement_id="m4"} 27.8
+
+posture_current_angle{patient_id="patient_001"} 25.8
+posture_current_angle{patient_id="patient_002"} 28.0
+posture_current_angle{patient_id="patient_003"} 30.2
+
+posture_alert_triggered{patient_id="patient_001",alert_type="excessive_lean"} 2
+posture_alert_triggered{patient_id="patient_002",alert_type="prolonged_slouch"} 3
+posture_alert_triggered{patient_id="patient_003",alert_type="forward_head_posture"} 1
+
+# Counter metrics
+posture_measurement_count{patient_id="patient_001"} 2500
+posture_measurement_count{patient_id="patient_002"} 2100
+posture_measurement_count{patient_id="patient_003"} 1850
+
+# Patient ID dimension
+posture_patient_id{patient_id="patient_001"} 1
+posture_patient_id{patient_id="patient_002"} 1
+posture_patient_id{patient_id="patient_003"} 1

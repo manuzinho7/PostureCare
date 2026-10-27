@@ -1,0 +1,111 @@
+@startuml PostureCare_Deployment
+!theme plain
+title PostureCare Deployment Architecture v2.0 - Phase 2 with GraphQL API
+
+package "Host Machine" {
+  package "Docker Engine + WSL 2" {
+    package "posture-net (Bridge Network)" {
+
+      component "PostgreSQL 15" as postgres
+      note right of postgres
+        PostgreSQL Container
+        Port: 5432
+        Database: posture_db
+        Volume: postgres_data
+        Data: Patient metadata, sessions
+      end note
+
+      component "Redis 7" as redis
+      note right of redis
+        Redis Container
+        Port: 6379
+        Service: Pub/Sub + Cache
+        Volume: redis_data
+      end note
+
+      component "Prometheus" as prometheus
+      note right of prometheus
+        Prometheus Container
+        Port: 9090
+        Service: Time-Series DB
+        Volume: prometheus_data
+        Retention: 15 days
+      end note
+
+      component "Push Gateway" as pushgw
+      note right of pushgw
+        Push Gateway Container
+        Port: 9091
+        Service: Batch Metrics Receiver
+      end note
+
+      component "GraphQL API" as graphql_api
+      note right of graphql_api
+        FastAPI + Strawberry
+        Port: 8000
+        Service: Data Query Layer
+        Auth: API Key (X-API-Key)
+      end note
+
+      component "Grafana" as grafana
+      note right of grafana
+        Grafana Container
+        Port: 3000
+        Service: Dashboard Platform
+        Volume: grafana_data
+      end note
+
+      prometheus --> pushgw : scrape (every 15s)
+      grafana --> prometheus : PromQL queries
+      grafana --> postgres : metadata queries
+      grafana --> graphql_api : REST/GraphQL
+      graphql_api --> postgres : patient queries
+      graphql_api --> prometheus : sensor metrics
+      graphql_api --> redis : pub/sub, cache
+      pushgw --> prometheus : batch metrics
+    }
+  }
+
+  package "Host Filesystem" {
+    database ProjectRoot
+    note right of ProjectRoot
+      docker-compose.yml
+      .env
+      prometheus/
+      grafana/
+      services/graphql_api/
+      scripts/
+      sample-data/
+    end note
+  }
+
+  package "Browser/Client Access" {
+    rectangle GrafanaUI
+    note right of GrafanaUI
+      http://localhost:3000
+      Dashboards: Clinician, Researcher, DevOps
+    end note
+    rectangle PrometheusUI
+    note right of PrometheusUI
+      http://localhost:9090
+      Query Builder
+    end note
+    rectangle GraphQLPlayground
+    note right of GraphQLPlayground
+      http://localhost:8000/graphql
+      Interactive API Explorer
+    end note
+    rectangle APIClient
+    note right of APIClient
+      External BI Tools
+      Mobile Apps
+    end note
+  }
+}
+
+GrafanaUI -.-> grafana : HTTP (admin/admin)
+PrometheusUI -.-> prometheus : HTTP
+GraphQLPlayground -.-> graphql_api : HTTP + API Key
+APIClient -.-> graphql_api : GraphQL/REST + Auth
+
+@enduml

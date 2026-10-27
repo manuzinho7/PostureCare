@@ -1,0 +1,129 @@
+@startuml PostureCare_Activity
+!theme plain
+title PostureCare Data Flow & Activity Diagram v2.0
+
+start
+
+partition "Data Ingestion" {
+  :Load CSV input;
+  :Parse patient/session metadata and sensor payload;
+  :Normalize IMU, EMG, and SmO2 readings;
+}
+
+partition "Validation Layer" {
+  if (Validate sensor data?) then (valid)
+    :Build SensorFrame objects;
+  else (invalid)
+    :Log error;
+    :Skip record;
+    stop
+  endif
+}
+
+partition "Prometheus Publishing" {
+  :Convert to Prometheus format and push to gateway (9091);
+  note right
+    Metrics:
+    - posture_spine_angle{patient_id}
+    - posture_shoulder_roll{patient_id}
+    - posture_head_tilt{patient_id}
+    - posture_alert_triggered
+  end note
+  :Prometheus stores TSDB data (15d retention);
+}
+
+partition "PostgreSQL Storage" {
+  :Persist patient, session, and measurement records;
+  note right
+    PostgreSQL (pg_db)
+  end note
+}
+
+partition "Real-time Event Publishing" {
+  :Publish event payloads to Redis Pub/Sub;
+  note right
+    Channels:
+    - new_frame:{patient_id}
+    - alerts:{patient_id}
+    - device_status:{device_id}
+  end note
+  :Notify GraphQL subscribers and WebSocket listeners;
+}
+
+partition "Alert Detection" {
+  if (Check alert conditions?) then (alert)
+    :Evaluate posture, EMG, SmO2, battery, and temperature thresholds;
+    :Generate and publish alert;
+  else (no alert)
+    :Continue;
+  endif
+}
+
+partition "GraphQL API Processing" {
+  :Receive client query or subscription;
+  if (Authentication OK?) then (yes)
+    :Validate X-API-Key and resolve through data_access;
+  else (no)
+    :Return 401 Unauthorized;
+    stop
+  endif
+}
+
+partition "Data Access Resolution" {
+  fork
+    :Fetch sensor data from Prometheus;
+    note right
+      - sensor_readings()
+      - alert_history()
+      - patient_metrics()
+    end note
+  fork again
+    :Fetch metadata from PostgreSQL;
+    note right
+      - patient()
+      - patients()
+      - sessions()
+      - session_metadata()
+    end note
+  fork again
+    :Check Redis cache;
+    note right
+      LRU Cache (5min TTL)
+      Performance optimization
+    end note
+  end fork
+}
+
+partition "Response Generation" {
+  :Aggregate results and apply pagination;
+  if (Is subscription?) then (yes)
+    :Stream events over WebSocket;
+    note right
+      Real-time updates via:
+      on_new_frame
+      on_alert
+      on_device_status
+    end note
+  else (no)
+    :Return JSON response;
+  endif
+}
+
+partition "Dashboard Visualization" {
+  :Grafana renders operational dashboards;
+  fork
+    :Patient Monitoring dashboard;
+  fork again
+    :Research Analytics dashboard;
+  fork again
+    :System Health dashboard;
+  end fork
+}
+
+partition "External Consumers" {
+  :BI tools, mobile apps, and analytics platforms consume the API;
+}
+
+end
+
+@enduml

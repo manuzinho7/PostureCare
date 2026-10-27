@@ -1,0 +1,78 @@
+@startuml PostureCare_Network
+!theme plain
+title PostureCare - Network & Infrastructure v2.0
+
+package "Host Machine" {
+  package "Browser" {
+    rectangle "http://localhost:3000" as browser_grafana
+    rectangle "http://localhost:8000/graphql" as browser_graphql
+    rectangle "http://localhost:9090" as browser_prom
+  }
+
+  package "Docker posture-net" {
+    node PostgreSQL as pg
+    node Redis as redis
+    node "Push Gateway" as pushgw
+    node Prometheus as prom
+    node "GraphQL API" as graphql
+    node Grafana as grafana
+    node "CSV Streamer" as streamer
+  }
+
+  package "Project Files" {
+    rectangle "docker-compose.yml"
+    rectangle "prometheus.yml"
+    rectangle "grafana/provisioning/"
+  }
+
+  package "Scripts" {
+    rectangle "csv_ingester.py"
+    rectangle "realtime_csv_streamer.py"
+  }
+}
+
+browser_grafana -.-> grafana : localhost:3000
+browser_graphql -.-> graphql : localhost:8000/graphql
+browser_prom -.-> prom : localhost:9090
+
+grafana --> graphql : GraphQL + auth
+graphql --> prom : PromQL/metrics queries
+graphql --> pg : patient/session metadata
+graphql --> redis : subscriptions + cache
+graphql --> pushgw : synthetic metrics
+prom --> pushgw : Scrape metrics\nTCP/9091 (every 15s)
+grafana --> pg : Metadata\nTCP/5432
+
+csv_ingester.py --> pushgw : HTTP POST\nmetrics
+streamer --> graphql : demo data stream
+
+note right of prom
+  Time-Series Database
+  15-day retention
+  prometheus_data volume
+end note
+
+note right of grafana
+  Dashboard Platform
+  4 provisioned dashboards
+  grafana_data volume
+end note
+
+note right of pushgw
+  Metrics Receiver
+  Scraping endpoint
+  pg_data volume
+end note
+
+note right of graphql
+  FastAPI + Strawberry
+  /graphql endpoint
+  API keys + subscriptions
+end note
+
+note right of redis
+  Pub/Sub backend
+  redis_data volume
+end note
+
+@enduml

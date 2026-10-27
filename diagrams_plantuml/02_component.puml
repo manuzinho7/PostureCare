@@ -1,0 +1,115 @@
+@startuml PostureCare_Component
+!theme plain
+title PostureCare Component Architecture v2.0 - Phase 2 with GraphQL API
+
+package "PostureCare Analytics Platform" {
+
+  package "Presentation Layer" {
+    component [Grafana Dashboard UI] as grafana_ui
+    component [Patient Monitoring Dashboard] as dash1
+    component [Research Analytics Dashboard] as dash2
+    component [System Health Dashboard] as dash3
+    component [GraphQL Playground] as playground
+
+    grafana_ui --> dash1
+    grafana_ui --> dash2
+    grafana_ui --> dash3
+  }
+
+  package "API & Query Layer" {
+    component [GraphQL API (FastAPI)] as graphql_api
+    note right of graphql_api
+      Port: 8000
+      GraphQL Schema + REST Endpoints
+      Authentication: API Key
+      Real-time: WebSocket Subscriptions
+    end note
+
+    component [Prometheus Query Engine] as prometheus_qi
+    note right of prometheus_qi
+      Port: 9090
+      PromQL Query Builder
+    end note
+  }
+
+  package "Ingestion & Messaging" {
+    component [Push Gateway] as pushgw
+    component [CSV Parser/Ingester] as parser
+    component [Redis Pub/Sub] as redis
+    note right of redis
+      Port: 6379
+      Event Distribution
+      Real-time notifications
+      Caching Layer
+    end note
+  }
+
+  package "Data Access Layer" {
+    component [Data Access Module] as data_access
+    note right of data_access
+      PrometheusDataAccess
+      PostgreSQLDataAccess
+      CachingLayer (LRU)
+    end note
+  }
+
+  package "Storage Layer" {
+    database [Prometheus TSDB] as prom_db
+    note right of prom_db
+      Time-Series Data
+      15 day retention
+      Sensor metrics
+    end note
+
+    database [PostgreSQL Metadata] as pg_db
+    note right of pg_db
+      Patient metadata
+      Sessions
+      User data
+    end note
+  }
+
+  package "Data Sources" {
+    artifact [posture_session_example.csv] as csv_data
+    artifact [ESP32 Wearable Sensors] as sensors
+  }
+
+  package "Users" {
+    actor clinician
+    actor researcher
+    actor devops
+    actor bi_tool
+  }
+
+  dash1 --> prometheus_qi : PromQL
+  dash2 --> prometheus_qi : PromQL
+  dash3 --> prometheus_qi : PromQL
+
+  dash1 --> graphql_api : GraphQL/REST
+  dash2 --> graphql_api : GraphQL/REST
+  dash3 --> graphql_api : GraphQL/REST
+
+  prometheus_qi --> prom_db : Read/Write
+  graphql_api --> data_access : Query metrics
+  data_access --> prometheus_qi : PromQL queries
+  data_access --> pg_db : Patient lookups
+  data_access --> redis : Cache/Subscribe
+
+  parser --> csv_data : Read CSV
+  parser --> pushgw : Push metrics
+  parser --> redis : Publish events
+  parser --> graphql_api : Notify API
+
+  pushgw --> prometheus_qi : Scrape every 15s
+  sensors --> pushgw : Push sensor data
+
+  playground -.-> graphql_api : Interactive queries
+
+  clinician --> grafana_ui : View dashboards
+  researcher --> grafana_ui : Analyze data
+  devops --> grafana_ui : Monitor health
+  bi_tool --> graphql_api : Query API
+
+}
+
+@enduml

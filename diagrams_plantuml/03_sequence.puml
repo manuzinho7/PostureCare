@@ -1,0 +1,76 @@
+@startuml PostureCare_Sequence
+!theme plain
+title PostureCare Data Flow - Sequence Diagram v2.0
+
+participant Operator
+participant CSVFile as "CSV File"
+participant Parser as "CSV Ingester\n(Python)"
+participant PushGW as "Push Gateway\n(9091)"
+participant Prom as "Prometheus\n(9090)"
+participant GraphQL as "GraphQL API\n(8000)"
+participant Redis as "Redis\n(6379)"
+participant Grafana as "Grafana\n(3000)"
+
+Operator -> Parser: ingest-csv.py / realtime_csv_streamer.py
+activate Parser
+Parser -> CSVFile: Read live or batch rows
+Parser -> Parser: Parse, validate, normalize
+note right of Parser
+  Validate columns
+  Validate timestamps
+  Normalize sensor frames
+end note
+
+Parser -> Parser: Convert to Prometheus metrics
+Parser -> PushGW: HTTP POST metrics
+activate PushGW
+PushGW -> PushGW: Buffer for scrape
+note right of PushGW
+  Measurement labels preserved
+  Ready for Prometheus scrape
+end note
+
+Parser -> GraphQL: Seed or publish demo data
+activate GraphQL
+GraphQL -> Prom: Push synthetic metrics
+GraphQL -> Redis: Publish real-time event
+note right of GraphQL
+  Authenticated API access
+  Queries and subscriptions
+end note
+
+Prom -> PushGW: GET /metrics
+activate Prom
+PushGW --> Prom: Return all metrics
+Prom -> Prom: Store in TSDB
+note right of Prom
+  15-day retention
+  PromQL query support
+end note
+
+Operator -> GraphQL: Query patient/session data
+GraphQL -> Prom: Read telemetry metrics
+GraphQL -> Redis: Check pub/sub cache
+GraphQL -> GraphQL: Resolve schema + auth
+note right of GraphQL
+  /graphql endpoint
+  API keys required for private resolvers
+end note
+
+Operator -> Grafana: Open browser\nhttp://localhost:3000
+activate Grafana
+note right of Operator
+  Login: admin/admin
+end note
+
+Grafana -> Prom: PromQL query
+Prom --> Grafana: Time-series data
+Grafana --> Operator: Display dashboards
+note right of Grafana
+  Patient Monitoring
+  Research Analytics
+  System Health
+  Sensor/Device Telemetry
+end note
+
+@enduml
